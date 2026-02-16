@@ -9,10 +9,10 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-# 🔴 PASTE YOUR TOKEN HERE
+# 🔴 YOUR TOKEN ADDED
 TOKEN = "8510228134:AAF1aCVc_RolYFFRLeKTtc3-AaUFeewebbo"
 
-CHOOSING, ANALYZING_SINGLY, ANALYZING_DOUBLY, DESIGNING_SINGLY = range(4)
+CHOOSING, ANALYZING_SINGLY, DESIGNING_SINGLY = range(3)
 
 # ---------------- RCC FUNCTIONS ---------------- #
 
