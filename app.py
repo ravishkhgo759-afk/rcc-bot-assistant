@@ -10,7 +10,7 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-TOKEN = os.getenv("8510228134:AAF1aCVc_RolYFFRLeKTtc3-AaUFeewebbo")
+TOKEN = os.getenv("8510228134:AAHr3CKa56xFBSj3UJw2n3fSmeUKqoWf_EU")
 
 CHOOSING, ANALYZING_SINGLY, ANALYZING_DOUBLY, DESIGNING_SINGLY = range(4)
 
