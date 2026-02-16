@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 # --- TOKEN from Environment Variable ---
-TOKEN = os.getenv("8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY")
+TOKEN = os.getenv("TOKEN")
 
 if not TOKEN:
     raise ValueError("No TOKEN found. Set TOKEN as environment variable.")
