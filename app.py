@@ -1,3 +1,4 @@
+import os
 import math
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -9,22 +10,18 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-# 🔴 YOUR TOKEN ADDED
-TOKEN = "8510228134:AAF1aCVc_RolYFFRLeKTtc3-AaUFeewebbo"
+TOKEN = os.getenv("8510228134:AAF1aCVc_RolYFFRLeKTtc3-AaUFeewebbo")
 
-CHOOSING, ANALYZING_SINGLY, DESIGNING_SINGLY = range(3)
+CHOOSING, ANALYZING_SINGLY, ANALYZING_DOUBLY, DESIGNING_SINGLY = range(4)
 
 # ---------------- RCC FUNCTIONS ---------------- #
 
 def analyze_singly_reinforced(b, d, Ast, fck, fy):
     xu = (0.87 * fy * Ast) / (0.36 * fck * b)
 
-    if fy == 250:
-        km = 0.53
-    elif fy == 415:
-        km = 0.48
-    else:
-        km = 0.46
+    if fy == 250: km = 0.53
+    elif fy == 415: km = 0.48
+    else: km = 0.46
 
     xu_max = km * d
 
@@ -38,27 +35,6 @@ def analyze_singly_reinforced(b, d, Ast, fck, fy):
 
     return section, round(xu, 2), round(Mu / 10**6, 2)
 
-
-def design_singly_reinforced(Mu_kNm, b, fck, fy):
-    Mu = Mu_kNm * 10**6
-
-    if fy == 250:
-        Q_lim = 0.148 * fck
-    elif fy == 415:
-        Q_lim = 0.138 * fck
-    else:
-        Q_lim = 0.133 * fck
-
-    d_req = math.sqrt(Mu / (Q_lim * b))
-    d_provided = math.ceil(d_req / 10) * 10
-
-    term = 1 - (4.6 * Mu) / (fck * b * d_provided**2)
-    if term < 0:
-        return "Increase depth (Doubly Required)", d_provided, 0
-
-    Ast = (0.5 * fck / fy) * (1 - math.sqrt(term)) * b * d_provided
-    return "Singly Reinforced", d_provided, round(Ast)
-
 # ---------------- BOT HANDLERS ---------------- #
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -68,14 +44,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await update.message.reply_text(
         "RCC Engineering Bot\nSelect Option:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True),
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
     )
     return CHOOSING
 
 
 async def ask_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Enter: b, d, Ast, fck, fy\nExample: 230, 450, 942, 20, 415",
+        "Enter: b, d, Ast, fck, fy\nExample: 230,450,942,20,415",
         reply_markup=ReplyKeyboardRemove()
     )
     return ANALYZING_SINGLY
@@ -93,50 +69,26 @@ async def perform_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def ask_design(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Enter: Mu(kNm), b, fck, fy\nExample: 150, 230, 20, 415",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return DESIGNING_SINGLY
-
-
-async def perform_design(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        params = [float(x.strip()) for x in update.message.text.split(",")]
-        result, d, Ast = design_singly_reinforced(*params)
-        await update.message.reply_text(
-            f"Result: {result}\nEffective Depth: {d} mm\nSteel Required: {Ast} mm²"
-        )
-    except:
-        await update.message.reply_text("Invalid format.")
-    return ConversationHandler.END
-
-
 def main():
-    app = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(TOKEN).build()
 
-    conv = ConversationHandler(
+    conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             CHOOSING: [
                 MessageHandler(filters.Regex("^Analyze Singly Beam$"), ask_analyze),
-                MessageHandler(filters.Regex("^Design Singly Beam$"), ask_design),
             ],
             ANALYZING_SINGLY: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, perform_analyze)
-            ],
-            DESIGNING_SINGLY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, perform_design)
             ],
         },
         fallbacks=[],
     )
 
-    app.add_handler(conv)
+    application.add_handler(conv_handler)
 
     print("Bot Running...")
-    app.run_polling()
+    application.run_polling()
 
 
 if __name__ == "__main__":
