@@ -1,57 +1,22 @@
-import os
+from flask import Flask, request
+import requests
 import math
-import asyncio
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    ContextTypes,
-    ConversationHandler,
-)
 
-# --- TOKEN from Environment Variable ---
-TOKEN = os.getenv("TOKEN")
+TOKEN = "YOUR_NEW_TELEGRAM_TOKEN"
 
-if not TOKEN:
-    raise ValueError("No TOKEN found. Set TOKEN as environment variable.")
+app = Flask(__name__)
 
-# --- Conversation States ---
-CHOOSING, ANALYZING_SINGLY, ANALYZING_DOUBLY, DESIGNING_SINGLY = range(4)
+# Temporary user storage
+user_data = {}
 
-# --- RCC FUNCTIONS ---
+# Conversation Steps
+CHOOSING = 0
+ANALYZE_SINGLY = 1
+ANALYZE_DOUBLY = 2
+DESIGN_SINGLY = 3
 
-def get_fsc_interpolated(strain_sc, fy):
-    if fy == 250:
-        return 0.87 * fy
 
-    tables = {
-        415: [(0.00144, 288.7), (0.00163, 306.7), (0.00192, 324.8),
-              (0.00241, 342.8), (0.00276, 351.8), (0.00380, 360.9)],
-        500: [(0.00174, 347.8), (0.00195, 369.6), (0.00226, 391.3),
-              (0.00277, 413.0), (0.00312, 423.9), (0.00417, 434.8)]
-    }
-
-    if fy not in tables:
-        return 0.87 * fy
-
-    data = tables[fy]
-
-    if strain_sc < data[0][0]:
-        return strain_sc * 2 * 10**5
-
-    if strain_sc >= data[-1][0]:
-        return data[-1][1]
-
-    for i in range(len(data) - 1):
-        x0, y0 = data[i]
-        x1, y1 = data[i + 1]
-        if x0 <= strain_sc < x1:
-            return y0 + (strain_sc - x0) * (y1 - y0) / (x1 - x0)
-
-    return 0.87 * fy
-
+# ---------------- RCC FUNCTIONS ---------------- #
 
 def analyze_singly_reinforced(b, d, Ast, fck, fy):
     xu = (0.87 * fy * Ast) / (0.36 * fck * b)
@@ -67,10 +32,9 @@ def analyze_singly_reinforced(b, d, Ast, fck, fy):
 
     if xu <= xu_max:
         section = "Under-Reinforced"
-        term = (Ast * fy) / (b * d * fck)
-        Mu = 0.87 * fy * Ast * d * (1 - term)
+        Mu = 0.87 * fy * Ast * d * (1 - (Ast * fy) / (b * d * fck))
     else:
-        section = "Over-Reinforced (Limited to xu_max)"
+        section = "Over-Reinforced (Limited)"
         Mu = 0.36 * fck * b * xu_max * (d - 0.42 * xu_max)
 
     return section, round(xu, 2), round(Mu / 10**6, 2)
@@ -87,119 +51,96 @@ def design_singly_reinforced(Mu_kNm, b, fck, fy):
         Q_lim = 0.133 * fck
 
     d_req = math.sqrt(Mu / (Q_lim * b))
-    d_provided = math.ceil(d_req / 10) * 10
+    d_prov = math.ceil(d_req / 10) * 10
 
-    term = 1 - (4.6 * Mu) / (fck * b * d_provided**2)
+    term = 1 - (4.6 * Mu) / (fck * b * d_prov**2)
     if term < 0:
-        return "Doubly Reinforced Required", d_provided, 0
+        return "Doubly Required", d_prov, 0
 
-    Ast = (0.5 * fck / fy) * (1 - math.sqrt(term)) * b * d_provided
-
-    Ast_min = (0.85 * b * d_provided) / fy
-    if Ast < Ast_min:
-        Ast = Ast_min
-
-    return "Singly Reinforced", d_provided, round(Ast)
+    Ast = (0.5 * fck / fy) * (1 - math.sqrt(term)) * b * d_prov
+    return "Singly Reinforced", d_prov, round(Ast)
 
 
-# --- BOT HANDLERS ---
+# ---------------- WEBHOOK ---------------- #
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["Analyze Singly Beam"],
-        ["Design Singly Beam"]
-    ]
-    await update.message.reply_text(
-        "Civil Engineering RCC Bot\nSelect module:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True),
-    )
-    return CHOOSING
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    data = request.get_json()
 
+    if "message" not in data:
+        return "ok"
 
-async def ask_analyze_singly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Enter: b, d, Ast, fck, fy\nExample:\n230, 450, 942, 20, 415",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return ANALYZING_SINGLY
+    chat_id = data["message"]["chat"]["id"]
+    text = data["message"].get("text", "")
 
+    if chat_id not in user_data:
+        user_data[chat_id] = {"step": CHOOSING}
 
-async def perform_analyze_singly(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    step = user_data[chat_id]["step"]
+
     try:
-        params = [float(x.strip()) for x in update.message.text.split(',')]
-        section, xu, Mu = analyze_singly_reinforced(*params)
-        await update.message.reply_text(
-            f"Type: {section}\n"
-            f"xu: {xu} mm\n"
-            f"Mu: {Mu} kNm"
-        )
-    except:
-        await update.message.reply_text("Invalid format.")
-    return ConversationHandler.END
 
-
-async def ask_design_singly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "Enter: Mu(kNm), b(mm), fck, fy\nExample:\n150, 230, 20, 415",
-        reply_markup=ReplyKeyboardRemove()
-    )
-    return DESIGNING_SINGLY
-
-
-async def perform_design_singly(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        params = [float(x.strip()) for x in update.message.text.split(',')]
-        result_type, d_prov, Ast_req = design_singly_reinforced(*params)
-
-        if result_type == "Doubly Reinforced Required":
-            msg = f"Section too small.\nRequired Depth: {d_prov} mm"
-        else:
-            bars = math.ceil(Ast_req / 201)
-            msg = (
-                f"Effective Depth: {d_prov} mm\n"
-                f"Total Depth ≈ {d_prov + 30} mm\n"
-                f"Ast Required: {Ast_req} mm²\n"
-                f"Provide {bars} bars of 16mm"
+        if step == CHOOSING:
+            user_data[chat_id]["step"] = CHOOSING
+            reply = (
+                "Select Option:\n"
+                "1. Analyze Singly Beam\n"
+                "2. Design Singly Beam\n\n"
+                "Reply with 1 or 2"
             )
 
-        await update.message.reply_text(msg)
+            if text == "1":
+                user_data[chat_id]["step"] = ANALYZE_SINGLY
+                reply = "Enter: b, d, Ast, fck, fy\nExample: 230,450,942,20,415"
+
+            elif text == "2":
+                user_data[chat_id]["step"] = DESIGN_SINGLY
+                reply = "Enter: Mu(kNm), b, fck, fy\nExample: 150,230,20,415"
+
+        elif step == ANALYZE_SINGLY:
+            params = [float(x.strip()) for x in text.split(",")]
+            section, xu, Mu = analyze_singly_reinforced(*params)
+
+            reply = (
+                f"--- RCC REPORT ---\n"
+                f"Type: {section}\n"
+                f"xu: {xu} mm\n"
+                f"Mu: {Mu} kNm"
+            )
+
+            user_data[chat_id]["step"] = CHOOSING
+
+        elif step == DESIGN_SINGLY:
+            params = [float(x.strip()) for x in text.split(",")]
+            result, d, Ast = design_singly_reinforced(*params)
+
+            if result == "Doubly Required":
+                reply = f"Section too small.\nMinimum Depth: {d} mm"
+            else:
+                reply = (
+                    f"--- DESIGN RESULT ---\n"
+                    f"Effective Depth: {d} mm\n"
+                    f"Total Depth: {d+30} mm\n"
+                    f"Steel Required: {Ast} mm²"
+                )
+
+            user_data[chat_id]["step"] = CHOOSING
+
+        else:
+            reply = "Type anything to start RCC calculation."
+            user_data[chat_id]["step"] = CHOOSING
+
     except:
-        await update.message.reply_text("Invalid format.")
-        return DESIGNING_SINGLY
+        reply = "Invalid Input. Use correct numeric format."
+        user_data[chat_id]["step"] = CHOOSING
 
-    return ConversationHandler.END
-
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Cancelled. Type /start")
-    return ConversationHandler.END
-
-
-async def main():
-    app = Application.builder().token(TOKEN).build()
-
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            CHOOSING: [
-                MessageHandler(filters.Regex("^Analyze Singly Beam$"), ask_analyze_singly),
-                MessageHandler(filters.Regex("^Design Singly Beam$"), ask_design_singly),
-            ],
-            ANALYZING_SINGLY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, perform_analyze_singly)
-            ],
-            DESIGNING_SINGLY: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, perform_design_singly)
-            ],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json={"chat_id": chat_id, "text": reply}
     )
 
-    app.add_handler(conv_handler)
-
-    print("Bot Running...")
-    await app.run_polling()
+    return "ok"
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    app.run(host="0.0.0.0", port=10000)
