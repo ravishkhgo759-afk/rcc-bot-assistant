@@ -2,7 +2,7 @@ from flask import Flask, request
 import requests
 import math
 
-TOKEN = "YOUR_NEW_TELEGRAM_TOKEN"
+TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 
 app = Flask(__name__)
 user_data = {}
