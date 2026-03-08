@@ -1,11 +1,30 @@
 from flask import Flask, request
 import requests
 import math
+from PIL import Image, ImageDraw
 
 TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 
 app = Flask(__name__)
 user_data = {}
+
+# ---------------- IMAGE GENERATOR ----------------
+
+def create_result_image(text):
+
+    img = Image.new("RGB",(600,350),"white")
+    draw = ImageDraw.Draw(img)
+
+    y = 80
+    for line in text.split("\n"):
+        draw.text((40,y),line,fill="black")
+        y += 40
+
+    path = "result.png"
+    img.save(path)
+
+    return path
+
 
 # ---------------- RCC FUNCTIONS ----------------
 
@@ -165,6 +184,62 @@ def design_singly_reinforced(Mu_kNm, b, fck, fy):
     return "Singly Reinforced", d_provided, round(Ast)
 
 
+# ---------------- NEW FUNCTIONS ----------------
+
+def design_doubly_reinforced(Mu_kNm,b,d,d_dash,fck,fy):
+
+    Mu = Mu_kNm*10**6
+
+    if fy == 250:
+        km = 0.53
+    elif fy == 415:
+        km = 0.48
+    else:
+        km = 0.46
+
+    xu_max = km*d
+
+    Mulim = 0.36*fck*b*xu_max*(d-0.42*xu_max)
+
+    if Mu <= Mulim:
+
+        Ast = Mu/(0.87*fy*d)
+        Asc = 0
+
+    else:
+
+        Ast1 = Mulim/(0.87*fy*d)
+
+        Mu2 = Mu-Mulim
+
+        Asc = Mu2/(0.87*fy*(d-d_dash))
+
+        Ast = Ast1 + Asc
+
+    return round(Ast,2),round(Asc,2)
+
+
+def design_shear(Vu_kN,b,d,fck):
+
+    Vu = Vu_kN*1000
+
+    tau_v = Vu/(b*d)
+
+    tau_c = 0.62*math.sqrt(fck)
+
+    if tau_v <= tau_c:
+
+        stirrup = "Minimum Shear Reinforcement"
+        spacing = 0.75*d
+
+    else:
+
+        stirrup = "Shear Reinforcement Required"
+        spacing = 0.5*d
+
+    return round(tau_v,3),stirrup,round(spacing,2)
+
+
 # ---------------- WEBHOOK LOGIC ----------------
 
 @app.route("/webhook", methods=["POST"])
@@ -191,8 +266,10 @@ def webhook():
                 "RCC ENGINEERING BOT\n\n"
                 "1. Analyze Singly Beam\n"
                 "2. Analyze Doubly Beam\n"
-                "3. Design Singly Beam\n\n"
-                "Reply with 1 / 2 / 3"
+                "3. Design Singly Beam\n"
+                "4. Design Doubly Beam\n"
+                "5. Design Beam for Shear\n\n"
+                "Reply with 1 / 2 / 3 / 4 / 5"
             )
 
         elif step == 1:
@@ -209,24 +286,55 @@ def webhook():
                 user_data[chat_id] = {"step": 2, "module": "design"}
                 reply = "Enter Mu(kNm), b, fck, fy"
 
+            elif text == "4":
+                user_data[chat_id] = {"step": 2, "module": "doubly_design"}
+                reply = "Enter Mu(kNm), b, d, d', fck, fy"
+
+            elif text == "5":
+                user_data[chat_id] = {"step": 2, "module": "shear"}
+                reply = "Enter Vu(kN), b, d, fck"
+
             else:
-                reply = "Reply 1 / 2 / 3"
+                reply = "Reply 1 / 2 / 3 / 4 / 5"
+
 
         elif user_data[chat_id]["module"] == "singly":
 
             params = [float(x.strip()) for x in text.split(",")]
             section, xu, Mu = analyze_singly_reinforced(*params)
 
-            reply = f"Type: {section}\nxu: {xu} mm\nMu: {Mu} kNm"
+            result = f"Type: {section}\nxu: {xu} mm\nMu: {Mu} kNm"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
             user_data[chat_id] = {"step": 0}
+            return "ok"
+
 
         elif user_data[chat_id]["module"] == "doubly":
 
             params = [float(x.strip()) for x in text.split(",")]
             section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
-            reply = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
+            result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
             user_data[chat_id] = {"step": 0}
+            return "ok"
+
 
         elif user_data[chat_id]["module"] == "design":
 
@@ -234,11 +342,59 @@ def webhook():
             result_type, d_prov, Ast_req = design_singly_reinforced(*params)
 
             if result_type == "Doubly Reinforced Required":
-                reply = f"Too small section.\nMin depth: {d_prov} mm"
+                result = f"Too small section.\nMin depth: {d_prov} mm"
             else:
-                reply = f"d_required: {d_prov} mm\nAst_required: {Ast_req} mm²"
+                result = f"d_required: {d_prov} mm\nAst_required: {Ast_req} mm²"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
 
             user_data[chat_id] = {"step": 0}
+            return "ok"
+
+
+        elif user_data[chat_id]["module"] == "doubly_design":
+
+            params = [float(x.strip()) for x in text.split(",")]
+            Ast, Asc = design_doubly_reinforced(*params)
+
+            result = f"Ast tension: {Ast} mm2\nAsc compression: {Asc} mm2"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
+            user_data[chat_id] = {"step": 0}
+            return "ok"
+
+
+        elif user_data[chat_id]["module"] == "shear":
+
+            params = [float(x.strip()) for x in text.split(",")]
+            tau_v, stirrup, spacing = design_shear(*params)
+
+            result = f"tau_v: {tau_v}\n{stirrup}\nSpacing: {spacing} mm"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
+            user_data[chat_id] = {"step": 0}
+            return "ok"
+
 
         else:
             reply = "Type /start"
