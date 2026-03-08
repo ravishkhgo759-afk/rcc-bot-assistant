@@ -8,16 +8,16 @@ TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 app = Flask(__name__)
 user_data = {}
 
-# ---------------- RESULT IMAGE ----------------
+# ---------------- IMAGE GENERATOR ----------------
 
 def create_result_image(text):
 
     img = Image.new("RGB",(600,350),"white")
     draw = ImageDraw.Draw(img)
 
-    y = 60
+    y = 80
     for line in text.split("\n"):
-        draw.text((40,y), line, fill="black")
+        draw.text((40,y),line,fill="black")
         y += 40
 
     path = "result.png"
@@ -186,9 +186,9 @@ def design_singly_reinforced(Mu_kNm, b, fck, fy):
 
 # ---------------- NEW FUNCTIONS ----------------
 
-def design_doubly_beam(Mu_kNm, b, d, d_dash, fck, fy):
+def design_doubly_reinforced(Mu_kNm,b,d,d_dash,fck,fy):
 
-    Mu = Mu_kNm * 10**6
+    Mu = Mu_kNm*10**6
 
     if fy == 250:
         km = 0.53
@@ -197,36 +197,47 @@ def design_doubly_beam(Mu_kNm, b, d, d_dash, fck, fy):
     else:
         km = 0.46
 
-    xu_max = km * d
+    xu_max = km*d
 
-    Mulim = 0.36 * fck * b * xu_max * (d - 0.42 * xu_max)
+    Mulim = 0.36*fck*b*xu_max*(d-0.42*xu_max)
 
     if Mu <= Mulim:
-        Ast = Mu / (0.87 * fy * d)
+
+        Ast = Mu/(0.87*fy*d)
         Asc = 0
+
     else:
-        Ast1 = Mulim / (0.87 * fy * d)
-        Mu2 = Mu - Mulim
-        Asc = Mu2 / (0.87 * fy * (d - d_dash))
+
+        Ast1 = Mulim/(0.87*fy*d)
+
+        Mu2 = Mu-Mulim
+
+        Asc = Mu2/(0.87*fy*(d-d_dash))
+
         Ast = Ast1 + Asc
 
-    return round(Ast,2), round(Asc,2)
+    return round(Ast,2),round(Asc,2)
 
 
-def design_shear(Vu_kN, b, d, fck):
+def design_shear(Vu_kN,b,d,fck):
 
-    Vu = Vu_kN * 1000
-    tau_v = Vu / (b * d)
-    tau_c = 0.62 * math.sqrt(fck)
+    Vu = Vu_kN*1000
+
+    tau_v = Vu/(b*d)
+
+    tau_c = 0.62*math.sqrt(fck)
 
     if tau_v <= tau_c:
-        stirrup = "Minimum Shear Reinforcement"
-        spacing = 0.75 * d
-    else:
-        stirrup = "Shear Reinforcement Required"
-        spacing = 0.5 * d
 
-    return round(tau_v,3), stirrup, round(spacing,2)
+        stirrup = "Minimum Shear Reinforcement"
+        spacing = 0.75*d
+
+    else:
+
+        stirrup = "Shear Reinforcement Required"
+        spacing = 0.5*d
+
+    return round(tau_v,3),stirrup,round(spacing,2)
 
 
 # ---------------- WEBHOOK LOGIC ----------------
@@ -286,10 +297,71 @@ def webhook():
             else:
                 reply = "Reply 1 / 2 / 3 / 4 / 5"
 
+
+        elif user_data[chat_id]["module"] == "singly":
+
+            params = [float(x.strip()) for x in text.split(",")]
+            section, xu, Mu = analyze_singly_reinforced(*params)
+
+            result = f"Type: {section}\nxu: {xu} mm\nMu: {Mu} kNm"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
+            user_data[chat_id] = {"step": 0}
+            return "ok"
+
+
+        elif user_data[chat_id]["module"] == "doubly":
+
+            params = [float(x.strip()) for x in text.split(",")]
+            section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
+
+            result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
+            user_data[chat_id] = {"step": 0}
+            return "ok"
+
+
+        elif user_data[chat_id]["module"] == "design":
+
+            params = [float(x.strip()) for x in text.split(",")]
+            result_type, d_prov, Ast_req = design_singly_reinforced(*params)
+
+            if result_type == "Doubly Reinforced Required":
+                result = f"Too small section.\nMin depth: {d_prov} mm"
+            else:
+                result = f"d_required: {d_prov} mm\nAst_required: {Ast_req} mm²"
+
+            img = create_result_image(result)
+
+            requests.post(
+                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+                data={"chat_id": chat_id, "caption": result},
+                files={"photo": open(img,"rb")}
+            )
+
+            user_data[chat_id] = {"step": 0}
+            return "ok"
+
+
         elif user_data[chat_id]["module"] == "doubly_design":
 
             params = [float(x.strip()) for x in text.split(",")]
-            Ast, Asc = design_doubly_beam(*params)
+            Ast, Asc = design_doubly_reinforced(*params)
 
             result = f"Ast tension: {Ast} mm2\nAsc compression: {Asc} mm2"
 
@@ -322,6 +394,7 @@ def webhook():
 
             user_data[chat_id] = {"step": 0}
             return "ok"
+
 
         else:
             reply = "Type /start"
