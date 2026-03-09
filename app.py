@@ -10,15 +10,33 @@ user_data = {}
 
 # ---------------- IMAGE GENERATOR ----------------
 
+# ---------------- IMAGE GENERATOR ----------------
+
 def create_result_image(text):
 
-    img = Image.new("RGB",(600,350),"white")
+    img = Image.new("RGB",(700,450),"white")
     draw = ImageDraw.Draw(img)
 
-    y = 80
+    y = 30
     for line in text.split("\n"):
-        draw.text((40,y),line,fill="black")
-        y += 40
+        draw.text((30,y),line,fill="black")
+        y += 35
+
+    x1,y1 = 350,120
+    x2,y2 = 550,320
+
+    draw.rectangle((x1,y1,x2,y2),outline="black",width=3,fill="#E8E8E8")
+    draw.rectangle((x1+15,y1+15,x2-15,y2-15),outline="green",width=3)
+
+    draw.ellipse((x1+40,y2-25,x1+55,y2-10),fill="red")
+    draw.ellipse((x1+80,y2-25,x1+95,y2-10),fill="red")
+    draw.ellipse((x1+120,y2-25,x1+135,y2-10),fill="red")
+
+    draw.ellipse((x1+60,y1+10,x1+75,y1+25),fill="blue")
+    draw.ellipse((x1+110,y1+10,x1+125,y1+25),fill="blue")
+
+    draw.text((x1+40,y2+5),"Tension Steel",fill="red")
+    draw.text((x1+40,y1-20),"Compression Steel",fill="blue")
 
     path = "result.png"
     img.save(path)
