@@ -7,58 +7,67 @@ TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 
 app = Flask(__name__)
 user_data = {}
+ 
+ # ---------------- IMAGE GENERATOR ----------------
 
-# ---------------- IMAGE GENERATOR ----------------
+def create_beam_diagram(result_text,b,d,d_dash,Ast,Asc,fck,fy):
 
- def create_beam_diagram(result_text,b,d,d_dash,Ast,Asc,fck,fy):
-
-    img = Image.new("RGB",(800,500),"white")
+    img = Image.new("RGB",(900,550),"white")
     draw = ImageDraw.Draw(img)
 
-    # ---------------- RESULT TEXT ----------------
+    # Result text
     y = 20
     for line in result_text.split("\n"):
         draw.text((30,y),line,fill="black")
-        y += 25
+        y += 30
 
-    # ---------------- BEAM SECTION ----------------
+    # Beam coordinates
+    x1 = 420
+    y1 = 140
+    x2 = 780
+    y2 = 420
 
-    x1 = 450
-    y1 = 120
-    x2 = 720
-    y2 = 380
+    # 3D beam
+    draw.rectangle((x1+10,y1+10,x2+10,y2+10),fill="#cfcfcf")
+    draw.rectangle((x1,y1,x2,y2),outline="black",width=3,fill="#eeeeee")
 
-    # concrete
-    draw.rectangle((x1,y1,x2,y2),outline="black",width=3)
+    # Stirrup
+    draw.rectangle((x1+20,y1+20,x2-20,y2-20),outline="green",width=3)
 
-    # stirrup
-    draw.rectangle((x1+15,y1+15,x2-15,y2-15),outline="green",width=3)
-
-    # compression steel
+    # Compression steel
     if Asc > 0:
-        draw.ellipse((x1+80,y1+20,x1+95,y1+35),fill="blue")
-        draw.ellipse((x2-95,y1+20,x2-80,y1+35),fill="blue")
-        draw.text((x1+60,y1-20),f"Asc = {Asc} mm2",fill="blue")
+        draw.ellipse((x1+120,y1+25,x1+140,y1+45),fill="blue")
+        draw.ellipse((x2-140,y1+25,x2-120,y1+45),fill="blue")
+        draw.text((x1+80,y1-30),"Compression Steel",fill="blue")
+        draw.text((x1+80,y1-10),"Asc = "+str(Asc)+" mm2",fill="blue")
 
-    # tension steel
-    bar_y = y2-30
-    draw.ellipse((x1+40,bar_y,x1+55,bar_y+15),fill="red")
-    draw.ellipse((x1+90,bar_y,x1+105,bar_y+15),fill="red")
-    draw.ellipse((x1+140,bar_y,x1+155,bar_y+15),fill="red")
-    draw.ellipse((x1+190,bar_y,x1+205,bar_y+15),fill="red")
+    # Tension steel
+    bar_y = y2-35
+    bars = [80,150,220,290]
 
-    draw.text((x1+60,y2+10),f"Ast = {Ast} mm2",fill="red")
+    for pos in bars:
+        draw.ellipse((x1+pos,bar_y,x1+pos+20,bar_y+20),fill="red")
 
-    # dimension labels
-    draw.text((x1+80,y2+40),f"b = {b} mm",fill="black")
-    draw.text((x2+10,(y1+y2)/2),f"d = {d} mm",fill="black")
-    draw.text((x2+10,y1+40),f"d' = {d_dash} mm",fill="black")
+    draw.text((x1+110,y2+10),"Tension Steel",fill="red")
+    draw.text((x1+110,y2+30),"Ast = "+str(Ast)+" mm2",fill="red")
 
-    # material
-    draw.text((x1+60,y1+70),f"fck = {fck} MPa",fill="black")
-    draw.text((x1+60,y1+95),f"fy = {fy} MPa",fill="black")
+    # Width dimension
+    draw.line((x1,y2+60,x2,y2+60),fill="black",width=2)
+    draw.text((x1+120,y2+70),"b = "+str(b)+" mm",fill="black")
 
-    path="result.png"
+    # Depth dimension
+    draw.line((x2+60,y1,x2+60,y2),fill="black",width=2)
+    draw.text((x2+70,(y1+y2)/2),"d = "+str(d)+" mm",fill="black")
+
+    # Cover d'
+    draw.line((x2+120,y1,x2+120,y1+d_dash),fill="black",width=2)
+    draw.text((x2+130,y1+10),"d' = "+str(d_dash)+" mm",fill="black")
+
+    # Material properties
+    draw.text((x1+100,y1+100),"fck = "+str(fck)+" MPa",fill="black")
+    draw.text((x1+100,y1+130),"fy = "+str(fy)+" MPa",fill="black")
+
+    path = "result.png"
     img.save(path)
 
     return path
@@ -359,8 +368,7 @@ def webhook():
             section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
             result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
-
-            img = create_result_image(result)
+img = create_beam_diagram(result,*params)
 
             requests.post(
                 f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
