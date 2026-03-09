@@ -3,7 +3,7 @@ import requests
 import math
 from PIL import Image, ImageDraw
 
-TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
+TOKEN = "8510228134:AAHXZQBhc8KY51R2utC5WP1CBZ8cQ7RHa_U"
 
 app = Flask(__name__)
 user_data = {}
