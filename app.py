@@ -2,7 +2,7 @@ from flask import Flask, request
 import requests
 import math
 from PIL import Image, ImageDraw
-
+img = create_beam_diagram(result,*params)
 TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 
 app = Flask(__name__)
