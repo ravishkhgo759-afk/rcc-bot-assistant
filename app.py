@@ -2,70 +2,46 @@ from flask import Flask, request
 import requests
 import math
 from PIL import Image, ImageDraw
-img = create_beam_diagram(result,*params)
 TOKEN = "8510228134:AAE4u90gkmAx-K72f7FzodPzkZJgfaGjRJY"
 
 app = Flask(__name__)
 user_data = {}
  
  # ---------------- IMAGE GENERATOR ----------------
+def create_result_image(text):
 
-def create_beam_diagram(result_text,b,d,d_dash,Ast,Asc,fck,fy):
-
-    img = Image.new("RGB",(900,550),"white")
+    img = Image.new("RGB",(700,450),"white")
     draw = ImageDraw.Draw(img)
 
-    # Result text
-    y = 20
-    for line in result_text.split("\n"):
+    # -------- TEXT RESULT --------
+    y = 30
+    for line in text.split("\n"):
         draw.text((30,y),line,fill="black")
-        y += 30
+        y += 35
 
-    # Beam coordinates
-    x1 = 420
-    y1 = 140
-    x2 = 780
-    y2 = 420
+    # -------- BEAM DIAGRAM --------
+    x1,y1 = 350,120
+    x2,y2 = 550,320
 
-    # 3D beam
-    draw.rectangle((x1+10,y1+10,x2+10,y2+10),fill="#cfcfcf")
-    draw.rectangle((x1,y1,x2,y2),outline="black",width=3,fill="#eeeeee")
+    # beam concrete
+    draw.rectangle((x1,y1,x2,y2),outline="black",width=3,fill="#E8E8E8")
 
-    # Stirrup
-    draw.rectangle((x1+20,y1+20,x2-20,y2-20),outline="green",width=3)
+    # stirrup
+    draw.rectangle((x1+15,y1+15,x2-15,y2-15),outline="green",width=3)
 
-    # Compression steel
-    if Asc > 0:
-        draw.ellipse((x1+120,y1+25,x1+140,y1+45),fill="blue")
-        draw.ellipse((x2-140,y1+25,x2-120,y1+45),fill="blue")
-        draw.text((x1+80,y1-30),"Compression Steel",fill="blue")
-        draw.text((x1+80,y1-10),"Asc = "+str(Asc)+" mm2",fill="blue")
+    # bottom bars
+    draw.ellipse((x1+40,y2-25,x1+55,y2-10),fill="red")
+    draw.ellipse((x1+80,y2-25,x1+95,y2-10),fill="red")
+    draw.ellipse((x1+120,y2-25,x1+135,y2-10),fill="red")
 
-    # Tension steel
-    bar_y = y2-35
-    bars = [80,150,220,290]
+    # top bars
+    draw.ellipse((x1+60,y1+10,x1+75,y1+25),fill="blue")
+    draw.ellipse((x1+110,y1+10,x1+125,y1+25),fill="blue")
 
-    for pos in bars:
-        draw.ellipse((x1+pos,bar_y,x1+pos+20,bar_y+20),fill="red")
-
-    draw.text((x1+110,y2+10),"Tension Steel",fill="red")
-    draw.text((x1+110,y2+30),"Ast = "+str(Ast)+" mm2",fill="red")
-
-    # Width dimension
-    draw.line((x1,y2+60,x2,y2+60),fill="black",width=2)
-    draw.text((x1+120,y2+70),"b = "+str(b)+" mm",fill="black")
-
-    # Depth dimension
-    draw.line((x2+60,y1,x2+60,y2),fill="black",width=2)
-    draw.text((x2+70,(y1+y2)/2),"d = "+str(d)+" mm",fill="black")
-
-    # Cover d'
-    draw.line((x2+120,y1,x2+120,y1+d_dash),fill="black",width=2)
-    draw.text((x2+130,y1+10),"d' = "+str(d_dash)+" mm",fill="black")
-
-    # Material properties
-    draw.text((x1+100,y1+100),"fck = "+str(fck)+" MPa",fill="black")
-    draw.text((x1+100,y1+130),"fy = "+str(fy)+" MPa",fill="black")
+    # labels
+    draw.text((x1+40,y2+5),"Tension Steel",fill="red")
+    draw.text((x1+40,y1-20),"Compression Steel",fill="blue")
+    draw.text((x1+70,y1+45),"Stirrup",fill="green")
 
     path = "result.png"
     img.save(path)
@@ -368,36 +344,9 @@ def webhook():
             section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
             result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
-params = [float(x.strip()) for x in text.split(",")]
-
-section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
-
-result = "Type: " + str(section) + "\n" + \
-         "xu: " + str(xu) + " mm\n" + \
-         "fsc: " + str(fsc) + "\n" + \
-         "Mu: " + str(Mu) + " kNm"
-
-img = create_beam_diagram(result,*params)
-
-requests.post(
-    "https://api.telegram.org/bot"+TOKEN+"/sendPhoto",
-    data={"chat_id": chat_id, "caption": result},
-    files={"photo": open(img,"rb")}
-)
-
-user_data[chat_id] = {"step": 0}
-return "ok"
-
-            requests.post(
-                f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
-                data={"chat_id": chat_id, "caption": result},
-                files={"photo": open(img,"rb")}
-            )
-
-            user_data[chat_id] = {"step": 0}
-            return "ok"
 
 
+         
         elif user_data[chat_id]["module"] == "design":
 
             params = [float(x.strip()) for x in text.split(",")]
