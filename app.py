@@ -10,76 +10,58 @@ user_data = {}
 
 # ---------------- IMAGE GENERATOR ----------------
 
+ def create_beam_diagram(result_text,b,d,d_dash,Ast,Asc,fck,fy):
 
-   def create_beam_diagram(result_text,b,d,d_dash,Ast,Asc,fck,fy):
-
-    img = Image.new("RGB",(900,550),"white")
+    img = Image.new("RGB",(800,500),"white")
     draw = ImageDraw.Draw(img)
 
-    # ---------- RESULT TEXT ----------
+    # ---------------- RESULT TEXT ----------------
     y = 20
     for line in result_text.split("\n"):
         draw.text((30,y),line,fill="black")
-        y += 30
+        y += 25
 
-    # ---------- BEAM POSITION ----------
-    x1 = 420
-    y1 = 140
-    x2 = 780
-    y2 = 420
+    # ---------------- BEAM SECTION ----------------
 
-    # pseudo 3D effect
-    draw.rectangle((x1+8,y1+8,x2+8,y2+8),fill="#cfcfcf")
-    draw.rectangle((x1,y1,x2,y2),outline="black",width=3,fill="#eeeeee")
+    x1 = 450
+    y1 = 120
+    x2 = 720
+    y2 = 380
+
+    # concrete
+    draw.rectangle((x1,y1,x2,y2),outline="black",width=3)
 
     # stirrup
-    draw.rectangle((x1+20,y1+20,x2-20,y2-20),outline="green",width=3)
+    draw.rectangle((x1+15,y1+15,x2-15,y2-15),outline="green",width=3)
 
-    # ---------- COMPRESSION STEEL ----------
+    # compression steel
     if Asc > 0:
-        draw.ellipse((x1+120,y1+25,x1+140,y1+45),fill="blue")
-        draw.ellipse((x2-140,y1+25,x2-120,y1+45),fill="blue")
+        draw.ellipse((x1+80,y1+20,x1+95,y1+35),fill="blue")
+        draw.ellipse((x2-95,y1+20,x2-80,y1+35),fill="blue")
+        draw.text((x1+60,y1-20),f"Asc = {Asc} mm2",fill="blue")
 
-        draw.text((x1+80,y1-30),"Compression Steel",fill="blue")
-        draw.text((x1+80,y1-10),f"Asc = {Asc} mm2",fill="blue")
+    # tension steel
+    bar_y = y2-30
+    draw.ellipse((x1+40,bar_y,x1+55,bar_y+15),fill="red")
+    draw.ellipse((x1+90,bar_y,x1+105,bar_y+15),fill="red")
+    draw.ellipse((x1+140,bar_y,x1+155,bar_y+15),fill="red")
+    draw.ellipse((x1+190,bar_y,x1+205,bar_y+15),fill="red")
 
-    # ---------- TENSION STEEL ----------
-    bar_y = y2-35
-    bars = [80,150,220,290]
+    draw.text((x1+60,y2+10),f"Ast = {Ast} mm2",fill="red")
 
-    for bpos in bars:
-        draw.ellipse((x1+bpos,bar_y,x1+bpos+20,bar_y+20),fill="red")
+    # dimension labels
+    draw.text((x1+80,y2+40),f"b = {b} mm",fill="black")
+    draw.text((x2+10,(y1+y2)/2),f"d = {d} mm",fill="black")
+    draw.text((x2+10,y1+40),f"d' = {d_dash} mm",fill="black")
 
-    draw.text((x1+110,y2+10),"Tension Steel",fill="red")
-    draw.text((x1+110,y2+30),f"Ast = {Ast} mm2",fill="red")
+    # material
+    draw.text((x1+60,y1+70),f"fck = {fck} MPa",fill="black")
+    draw.text((x1+60,y1+95),f"fy = {fy} MPa",fill="black")
 
-    # ---------- WIDTH DIMENSION ----------
-    draw.line((x1,y2+60,x2,y2+60),fill="black",width=2)
-    draw.polygon([(x1,y2+60),(x1+10,y2+55),(x1+10,y2+65)],fill="black")
-    draw.polygon([(x2,y2+60),(x2-10,y2+55),(x2-10,y2+65)],fill="black")
-    draw.text(((x1+x2)/2-30,y2+70),f"b = {b} mm",fill="black")
-
-    # ---------- DEPTH DIMENSION ----------
-    draw.line((x2+60,y1,x2+60,y2),fill="black",width=2)
-    draw.polygon([(x2+60,y1),(x2+55,y1+10),(x2+65,y1+10)],fill="black")
-    draw.polygon([(x2+60,y2),(x2+55,y2-10),(x2+65,y2-10)],fill="black")
-    draw.text((x2+70,(y1+y2)/2),f"d = {d} mm",fill="black")
-
-    # ---------- COVER d' ----------
-    draw.line((x2+120,y1,x2+120,y1+d_dash),fill="black",width=2)
-    draw.polygon([(x2+120,y1),(x2+115,y1+10),(x2+125,y1+10)],fill="black")
-    draw.polygon([(x2+120,y1+d_dash),(x2+115,y1+d_dash-10),(x2+125,y1+d_dash-10)],fill="black")
-    draw.text((x2+130,y1+10),f"d' = {d_dash} mm",fill="black")
-
-    # ---------- MATERIAL ----------
-    draw.text((x1+100,y1+100),f"fck = {fck} MPa",fill="black")
-    draw.text((x1+100,y1+130),f"fy = {fy} MPa",fill="black")
-
-    path = "result.png"
+    path="result.png"
     img.save(path)
 
     return path
-
 # ---------------- RCC FUNCTIONS ----------------
 
 def get_fsc_interpolated(strain_sc, fy):
