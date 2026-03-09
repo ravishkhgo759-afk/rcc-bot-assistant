@@ -368,27 +368,25 @@ def webhook():
             section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
             result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
-try:
+params = [float(x.strip()) for x in text.split(",")]
 
-    params = [float(x.strip()) for x in text.split(",")]
+section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
-    section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
+result = "Type: " + str(section) + "\n" + \
+         "xu: " + str(xu) + " mm\n" + \
+         "fsc: " + str(fsc) + "\n" + \
+         "Mu: " + str(Mu) + " kNm"
 
-    result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
+img = create_beam_diagram(result,*params)
 
-    img = create_beam_diagram(result,*params)
+requests.post(
+    "https://api.telegram.org/bot"+TOKEN+"/sendPhoto",
+    data={"chat_id": chat_id, "caption": result},
+    files={"photo": open(img,"rb")}
+)
 
-    requests.post(
-        f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
-        data={"chat_id": chat_id, "caption": result},
-        files={"photo": open(img,"rb")}
-    )
-
-    user_data[chat_id] = {"step": 0}
-    return "ok"
-
-except:
-    reply = "Invalid Input. Follow correct format."
+user_data[chat_id] = {"step": 0}
+return "ok"
 
             requests.post(
                 f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
