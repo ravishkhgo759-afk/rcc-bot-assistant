@@ -368,7 +368,27 @@ def webhook():
             section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
 
             result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
-img = create_beam_diagram(result,*params)
+try:
+
+    params = [float(x.strip()) for x in text.split(",")]
+
+    section, xu, fsc, Mu = analyze_doubly_reinforced(*params)
+
+    result = f"Type: {section}\nxu: {xu} mm\nfsc: {fsc}\nMu: {Mu} kNm"
+
+    img = create_beam_diagram(result,*params)
+
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
+        data={"chat_id": chat_id, "caption": result},
+        files={"photo": open(img,"rb")}
+    )
+
+    user_data[chat_id] = {"step": 0}
+    return "ok"
+
+except:
+    reply = "Invalid Input. Follow correct format."
 
             requests.post(
                 f"https://api.telegram.org/bot{TOKEN}/sendPhoto",
