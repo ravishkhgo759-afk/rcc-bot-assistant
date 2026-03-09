@@ -282,16 +282,23 @@ def webhook():
     try:
 
         if text == "/start":
-            user_data[chat_id]["step"] = 1
-            reply = (
-                "RCC ENGINEERING BOT\n\n"
-                "1. Analyze Singly Beam\n"
-                "2. Analyze Doubly Beam\n"
-                "3. Design Singly Beam\n"
-                "4. Design Doubly Beam\n"
-                "5. Design Beam for Shear\n\n"
-                "Reply with 1 / 2 / 3 / 4 / 5"
-            )
+    user_data[chat_id]["step"] = 1
+    reply = (
+        "RCC ENGINEERING BOT\n\n"
+        "1. Analyze Singly Beam\n"
+        "2. Analyze Doubly Beam\n"
+        "3. Design Singly Beam\n"
+        "4. Design Doubly Beam\n"
+        "5. Design Beam for Shear\n\n"
+        "Reply with 1 / 2 / 3 / 4 / 5"
+    )
+
+    requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/sendMessage",
+        json={"chat_id": chat_id, "text": reply}
+    )
+
+    return "ok"
 
         elif step == 1:
 
